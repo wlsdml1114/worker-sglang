@@ -1,3 +1,6 @@
+import importlib
+import importlib.machinery
+import sys
 import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -56,11 +59,55 @@ class SGLangLauncherTests(unittest.TestCase):
             result["chat_template_kwargs"], {"enable_thinking": False}
         )
 
+    def test_import_hook_patches_responses_module_after_it_loads(self):
+        target = "lazy_responses_test_module"
+
+        class FakeLoader:
+            def create_module(self, spec):
+                return None
+
+            def exec_module(self, module):
+                module.ChatCompletionRequest = lambda **kwargs: kwargs
+
+        spec = importlib.machinery.ModuleSpec(target, FakeLoader())
+        original_meta_path = list(sys.meta_path)
+        try:
+            with (
+                patch.object(
+                    sglang_launcher,
+                    "RESPONSES_MODULE",
+                    target,
+                    create=True,
+                ),
+                patch.object(
+                    importlib.machinery.PathFinder,
+                    "find_spec",
+                    return_value=spec,
+                ),
+            ):
+                sglang_launcher.install_responses_import_hook()
+                self.assertNotIn(target, sys.modules)
+
+                module = importlib.import_module(target)
+
+            request = module.ChatCompletionRequest(model="model")
+            self.assertEqual(
+                request.get("chat_template_kwargs"),
+                {"enable_thinking": False},
+            )
+        finally:
+            sys.meta_path[:] = original_meta_path
+            sys.modules.pop(target, None)
+
     @patch("sglang_launcher.runpy.run_module")
+    @patch("sglang_launcher.install_responses_import_hook", create=True)
     @patch("sglang_launcher.install_responses_compatibility")
-    def test_main_installs_shim_only_when_enabled(self, install, run_module):
+    def test_main_installs_lazy_shim_only_when_enabled(
+        self, install, install_import_hook, run_module
+    ):
         sglang_launcher.main({"RESPONSES_DISABLE_THINKING": "true"})
-        install.assert_called_once_with()
+        install.assert_not_called()
+        install_import_hook.assert_called_once_with()
         run_module.assert_called_once_with(
             "sglang.launch_server", run_name="__main__"
         )
