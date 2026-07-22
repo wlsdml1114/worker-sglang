@@ -2,12 +2,8 @@ import os
 import signal
 import subprocess
 import time
-from pathlib import Path
 
 import requests
-
-
-SGLANG_LAUNCHER = str(Path(__file__).resolve().with_name("sglang_launcher.py"))
 
 
 VALUE_OPTIONS = {
@@ -101,7 +97,8 @@ class SGlangEngine:
         """Build an argv list for the SGLang v0.5.15 server."""
         command = [
             "python3",
-            SGLANG_LAUNCHER,
+            "-m",
+            "sglang.launch_server",
             "--host",
             self.host,
             "--port",

@@ -1,5 +1,11 @@
 # Codex Responses Compatibility Design
 
+> Deployment amendment: the runtime launcher shim described below was replaced
+> after RunPod startup testing. The final implementation patches the pinned
+> SGLang `serving_responses.py` during the Docker build and keeps the standard
+> `python -m sglang.launch_server` startup path. The API behavior and opt-in
+> environment variable remain unchanged.
+
 **Date:** 2026-07-22
 **Status:** Approved for implementation planning
 

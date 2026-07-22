@@ -1,5 +1,10 @@
 # Codex Responses Compatibility Implementation Plan
 
+> Deployment amendment: production testing replaced the runtime launcher steps
+> with a build-time patch of the pinned SGLang Responses adapter. The worker now
+> retains the standard `python -m sglang.launch_server` entrypoint while keeping
+> the same opt-in `RESPONSES_DISABLE_THINKING` behavior.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make the pinned SGLang RunPod worker preserve valid Responses API SSE frames and optionally disable Qwen thinking only inside the Responses adapter.

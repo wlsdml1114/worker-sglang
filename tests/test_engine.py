@@ -1,5 +1,4 @@
 import unittest
-from pathlib import Path
 
 from engine import SGlangEngine
 
@@ -35,10 +34,11 @@ class SGlangEngineCommandTests(unittest.TestCase):
         command = engine.build_command()
 
         self.assertEqual(
-            command[:6],
+            command[:7],
             [
                 "python3",
-                str(Path(__file__).resolve().parents[1] / "sglang_launcher.py"),
+                "-m",
+                "sglang.launch_server",
                 "--host",
                 "127.0.0.1",
                 "--port",
@@ -74,7 +74,7 @@ class SGlangEngineCommandTests(unittest.TestCase):
         ):
             self.assertNotIn(removed_option, command)
 
-    def test_build_command_starts_worker_owned_launcher(self):
+    def test_build_command_uses_standard_sglang_entrypoint(self):
         engine = SGlangEngine(
             env={
                 "MODEL_NAME": "Qwen/Qwen3-8B",
@@ -83,14 +83,12 @@ class SGlangEngineCommandTests(unittest.TestCase):
             }
         )
         command = engine.build_command()
-        expected_launcher = str(
-            Path(__file__).resolve().parents[1] / "sglang_launcher.py"
-        )
         self.assertEqual(
-            command[:6],
+            command[:7],
             [
                 "python3",
-                expected_launcher,
+                "-m",
+                "sglang.launch_server",
                 "--host",
                 "127.0.0.1",
                 "--port",

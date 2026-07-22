@@ -11,8 +11,11 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     python3 -m pip install --no-cache-dir -r requirements.txt
 
 # copy source files
-COPY handler.py engine.py utils.py sglang_launcher.py download_model.py test_input.json ./
+COPY handler.py engine.py utils.py patch_sglang_responses.py download_model.py test_input.json ./
 COPY public/ ./public/
+
+# Patch the pinned SGLang Responses adapter without changing server startup order.
+RUN python3 -c "from patch_sglang_responses import patch_file; patch_file('/sgl-workspace/sglang/python/sglang/srt/entrypoints/openai/serving_responses.py')"
 
 # Setup for Option 2: Building the Image with the Model included
 ARG MODEL_NAME=""

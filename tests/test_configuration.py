@@ -73,13 +73,15 @@ class BuildConfigurationTests(unittest.TestCase):
         self.assertNotIn("DISABLE_CUDA_GRAPH", env_names)
         self.assertNotIn("ENABLE_FLASHINFER_MLA", env_names)
 
-    def test_image_includes_responses_launcher_and_documents_opt_in(self):
+    def test_image_patches_responses_adapter_and_documents_opt_in(self):
         dockerfile = (ROOT / "Dockerfile").read_text()
         readme = (ROOT / "README.md").read_text()
         hub = json.loads((ROOT / ".runpod" / "hub.json").read_text())
         env = {entry["key"]: entry for entry in hub["config"]["env"]}
 
-        self.assertIn("sglang_launcher.py", dockerfile)
+        self.assertIn("patch_sglang_responses.py", dockerfile)
+        self.assertIn("patch_file", dockerfile)
+        self.assertNotIn("sglang_launcher.py", dockerfile)
         self.assertIn("RESPONSES_DISABLE_THINKING", readme)
         self.assertIn("RESPONSES_DISABLE_THINKING", env)
         self.assertEqual(
