@@ -125,6 +125,7 @@ All behaviour is controlled through environment variables:
 | `MAX_CONCURRENCY`       | Max concurrent RunPod requests      | 300     |
 | `REQUEST_TIMEOUT`       | Total request timeout (seconds)     | 600     |
 | `STREAM_READ_TIMEOUT`   | Stream read timeout (seconds)       | 300     |
+| `RESPONSES_DISABLE_THINKING` | Disable Qwen-style thinking only for the Responses adapter | false |
 
 ## Tool/Function Calling and Reasoning
 
@@ -139,6 +140,16 @@ All behaviour is controlled through environment variables:
   pinned SGLang release. If unset, the worker does not pass a parser override.
   - Example (docker-compose): add `# REASONING_PARSER=llama3` under `environment:` (uncomment to use).
   - Example (RunPod Hub): set the `REASONING_PARSER` env var in the UI.
+
+### Responses compatibility for Qwen tool calling
+
+`RESPONSES_DISABLE_THINKING` is an opt-in compatibility switch for Qwen-style
+chat templates served through SGLang's `/v1/responses` adapter. Set it to
+`true` only when automatic tool calls remain in reasoning instead of emitting
+a function call. It injects
+`chat_template_kwargs.enable_thinking=false` into the adapter's internal chat
+request. The default is `false`, and direct `/v1/chat/completions` requests are
+not changed.
 
 ## API Usage
 

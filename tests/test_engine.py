@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 
 from engine import SGlangEngine
 
@@ -34,11 +35,10 @@ class SGlangEngineCommandTests(unittest.TestCase):
         command = engine.build_command()
 
         self.assertEqual(
-            command[:7],
+            command[:6],
             [
                 "python3",
-                "-m",
-                "sglang.launch_server",
+                str(Path(__file__).resolve().parents[1] / "sglang_launcher.py"),
                 "--host",
                 "127.0.0.1",
                 "--port",
@@ -73,6 +73,30 @@ class SGlangEngineCommandTests(unittest.TestCase):
             "--disable-cuda-graph",
         ):
             self.assertNotIn(removed_option, command)
+
+    def test_build_command_starts_worker_owned_launcher(self):
+        engine = SGlangEngine(
+            env={
+                "MODEL_NAME": "Qwen/Qwen3-8B",
+                "HOST": "127.0.0.1",
+                "PORT": "31000",
+            }
+        )
+        command = engine.build_command()
+        expected_launcher = str(
+            Path(__file__).resolve().parents[1] / "sglang_launcher.py"
+        )
+        self.assertEqual(
+            command[:6],
+            [
+                "python3",
+                expected_launcher,
+                "--host",
+                "127.0.0.1",
+                "--port",
+                "31000",
+            ],
+        )
 
     def test_build_command_handles_booleans_and_lora_paths(self):
         engine = SGlangEngine(

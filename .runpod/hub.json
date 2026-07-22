@@ -57,6 +57,17 @@
         }
       },
       {
+        "key": "RESPONSES_DISABLE_THINKING",
+        "input": {
+          "name": "Disable Responses Thinking",
+          "type": "boolean",
+          "description": "Disable Qwen-style thinking only for the SGLang Responses API adapter",
+          "default": false,
+          "required": false,
+          "advanced": true
+        }
+      },
+      {
         "key": "TOKENIZER_PATH",
         "input": {
           "name": "Tokenizer Path",
