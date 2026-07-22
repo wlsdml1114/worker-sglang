@@ -7,7 +7,8 @@ WORKDIR /sgl-workspace
 # install dependencies
 COPY requirements.txt ./
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --no-cache-dir -r requirements.txt
+    python3 -m pip install --no-cache-dir --ignore-installed "cryptography>=49.0.0" && \
+    python3 -m pip install --no-cache-dir -r requirements.txt
 
 # copy source files
 COPY handler.py engine.py utils.py download_model.py test_input.json ./

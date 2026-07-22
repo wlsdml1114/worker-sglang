@@ -23,6 +23,19 @@ class BuildConfigurationTests(unittest.TestCase):
             re.search(r"lmsysorg/sglang:latest(?:-runtime)?", dockerfile + bake)
         )
 
+    def test_dockerfile_bootstraps_untracked_system_cryptography(self):
+        dockerfile = (ROOT / "Dockerfile").read_text()
+
+        bootstrap = (
+            'python3 -m pip install --no-cache-dir --ignore-installed '
+            '"cryptography>=49.0.0"'
+        )
+        requirements_install = "python3 -m pip install --no-cache-dir -r requirements.txt"
+
+        self.assertIn(bootstrap, dockerfile)
+        self.assertIn(requirements_install, dockerfile)
+        self.assertLess(dockerfile.index(bootstrap), dockerfile.index(requirements_install))
+
     def test_compose_uses_per_phase_cuda_graph_backends(self):
         compose = (ROOT / "docker-compose.yml").read_text()
 
