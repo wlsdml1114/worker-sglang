@@ -1,7 +1,7 @@
 import asyncio
 import unittest
 
-from utils import async_process_response
+from utils import async_process_response, format_sse_chunk
 
 
 class FakeContent:
@@ -37,6 +37,15 @@ async def collect_response(response, is_stream=False, route="/v1/chat/completion
 
 
 class ResponseProcessingTests(unittest.TestCase):
+    def test_format_sse_chunk_formats_raw_json_payload(self):
+        self.assertEqual(
+            format_sse_chunk('{"token":"hello"}'),
+            'data: {"token": "hello"}\n\n',
+        )
+
+    def test_format_sse_chunk_formats_raw_done_marker(self):
+        self.assertEqual(format_sse_chunk("[DONE]"), "data: [DONE]\n\n")
+
     def test_non_success_response_yields_structured_error(self):
         response = FakeResponse(status=500, body="boom")
 

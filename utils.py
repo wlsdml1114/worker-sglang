@@ -28,7 +28,10 @@ def format_sse_frame(lines: list[str]) -> str:
 
 def format_sse_chunk(chunk: str) -> str:
     """Backward-compatible formatter for a single-field SSE frame."""
-    return format_sse_frame([chunk.strip()])
+    chunk = chunk.strip()
+    if chunk.startswith("data:"):
+        chunk = chunk[5:]
+    return _format_sse_data(chunk) + "\n\n"
 
 
 async def async_process_stream(response):
