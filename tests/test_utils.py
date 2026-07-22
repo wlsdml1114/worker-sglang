@@ -63,7 +63,7 @@ class ResponseProcessingTests(unittest.TestCase):
 
     def test_stream_response_formats_sse_and_done_marker(self):
         response = FakeResponse(
-            lines=[b'data: {"token":"hello"}\n', b"data: [DONE]\n"]
+            lines=[b'data: {"token":"hello"}\n\n', b"data: [DONE]\n\n"]
         )
 
         result = asyncio.run(collect_response(response, is_stream=True))
@@ -72,6 +72,48 @@ class ResponseProcessingTests(unittest.TestCase):
             result,
             ['data: {"token": "hello"}\n\n', "data: [DONE]\n\n"],
         )
+
+    def test_stream_response_preserves_responses_event_frame(self):
+        response = FakeResponse(
+            lines=[
+                b"event: response.created\n",
+                b'data: {"type":"response.created"}\n',
+                b"\n",
+            ]
+        )
+        result = asyncio.run(collect_response(response, is_stream=True))
+        self.assertEqual(
+            result,
+            [
+                "event: response.created\n"
+                'data: {"type": "response.created"}\n\n'
+            ],
+        )
+
+    def test_stream_response_handles_coalesced_and_fragmented_frames(self):
+        response = FakeResponse(
+            lines=[
+                b"event: response.output_text.delta\nda",
+                b'ta: {"delta":"h',
+                b'i"}\n\nevent: response.completed\n',
+                b'data: {"type":"response.completed"}',
+            ]
+        )
+        result = asyncio.run(collect_response(response, is_stream=True))
+        self.assertEqual(
+            result,
+            [
+                "event: response.output_text.delta\n"
+                'data: {"delta": "hi"}\n\n',
+                "event: response.completed\n"
+                'data: {"type": "response.completed"}\n\n',
+            ],
+        )
+
+    def test_stream_response_preserves_non_json_data(self):
+        response = FakeResponse(lines=[b"data: plain text\n\n"])
+        result = asyncio.run(collect_response(response, is_stream=True))
+        self.assertEqual(result, ["data: plain text\n\n"])
 
 
 if __name__ == "__main__":
