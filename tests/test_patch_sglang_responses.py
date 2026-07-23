@@ -78,6 +78,79 @@ class PatchSGLangResponsesTests(unittest.TestCase):
             patched,
         )
 
+    def test_poolside_responses_use_recommended_sampling_defaults(self):
+        module = importlib.import_module("patch_sglang_responses")
+        source = (
+            "import logging\n"
+            "\n"
+            "logger = logging.getLogger(__name__)\n"
+            "\n"
+            "        chat_request = ChatCompletionRequest(\n"
+            "            stop=request.stop,\n"
+            "        )\n"
+        )
+
+        patched = module.patch_source(source)
+
+        self.assertIn(
+            "temperature=_responses_sampling_value("
+            'self.reasoning_parser, request.temperature, "temperature"),',
+            patched,
+        )
+        self.assertIn(
+            "top_p=_responses_sampling_value("
+            'self.reasoning_parser, request.top_p, "top_p"),',
+            patched,
+        )
+
+    def test_poolside_sampling_defaults_preserve_explicit_request_values(self):
+        module = importlib.import_module("patch_sglang_responses")
+
+        self.assertEqual(
+            module.responses_sampling_value("poolside_v1", None, "temperature"),
+            0.7,
+        )
+        self.assertEqual(
+            module.responses_sampling_value("poolside_v1", None, "top_p"), 0.95
+        )
+        self.assertEqual(
+            module.responses_sampling_value("poolside_v1", 0.2, "temperature"),
+            0.2,
+        )
+        self.assertIsNone(
+            module.responses_sampling_value("qwen3", None, "temperature")
+        )
+
+    def test_failed_native_tool_parse_preserves_raw_model_output(self):
+        module = importlib.import_module("patch_sglang_responses")
+        source = (
+            "import logging\n"
+            "\n"
+            "logger = logging.getLogger(__name__)\n"
+            "\n"
+            "        chat_request = ChatCompletionRequest(\n"
+            "            stop=request.stop,\n"
+            "        )\n"
+            "\n"
+            "            if should_try_native and parser.has_tool_call(content):\n"
+            "                try:\n"
+            "                    content, call_info_list = parser.parse_non_stream(content)\n"
+            "                    for call_info in call_info_list:\n"
+            "                        pass\n"
+            "                    parsed_via_native = bool(call_info_list)\n"
+            "                except Exception as e:\n"
+            '                    logger.error("Tool call parsing error: %s", e)\n'
+        )
+
+        patched = module.patch_source(source)
+
+        self.assertIn("raw_tool_content = content", patched)
+        self.assertIn(
+            "if not call_info_list:\n"
+            "                        content = raw_tool_content",
+            patched,
+        )
+
     def test_poolside_thinking_is_enabled_unless_request_explicitly_disables_it(self):
         module = importlib.import_module("patch_sglang_responses")
 
