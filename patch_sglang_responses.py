@@ -1,6 +1,8 @@
 """Patch the pinned SGLang Responses adapter during the image build."""
 
 import os
+import re
+import shlex
 from pathlib import Path
 
 
@@ -14,6 +16,15 @@ THINKING_ANCHOR = (
 TOOL_PARSE_ANCHOR = (
     "                    content, call_info_list = parser.parse_non_stream(content)\n"
     "                    for call_info in call_info_list:\n"
+)
+TOOL_PARSER_ANCHOR = (
+    "        if (\n"
+    "            content\n"
+    "            and chat_tools\n"
+    "            and self.tool_call_parser\n"
+    '            and request.tool_choice != "none"\n'
+    "        ):\n"
+    "            parser = FunctionCallParser(\n"
 )
 
 HELPER = (
@@ -40,6 +51,38 @@ HELPER = (
     '    if model_type != "poolside_v1":\n'
     "        return None\n"
     '    return {"temperature": 0.7, "top_p": 0.95}[parameter]\n'
+    "\n\n"
+    "def _normalize_poolside_tool_aliases(model_type, content, chat_tools):\n"
+    '    if model_type != "poolside_v1":\n'
+    "        return content\n"
+    "    tool_names = {\n"
+    '        getattr(getattr(tool, "function", None), "name", None)\n'
+    "        for tool in chat_tools\n"
+    "    }\n"
+    '    if "exec_command" not in tool_names:\n'
+    "        return content\n"
+    "\n"
+    "    def replace_read_alias(match):\n"
+    "        arguments = dict(re.findall(\n"
+    '            r"<arg_key>(path|file_path|workdir)</arg_key>\\s*"\n'
+    '            r"<arg_value>(.*?)</arg_value>",\n'
+    "            match.group(2), flags=re.DOTALL,\n"
+    "        ))\n"
+    '        path = arguments.get("path") or arguments.get("file_path")\n'
+    "        if not path:\n"
+    "            return match.group(0)\n"
+    "        command = \"sed -n '1,240p' -- \" + shlex.quote(path)\n"
+    '        replacement = "<tool_call>exec_command<arg_key>cmd</arg_key>"\n'
+    '        replacement += f"<arg_value>{command}</arg_value>"\n'
+    '        if arguments.get("workdir"):\n'
+    '            replacement += "<arg_key>workdir</arg_key>"\n'
+    '            replacement += f"<arg_value>{arguments[\'workdir\']}</arg_value>"\n'
+    '        return replacement + "</tool_call>"\n'
+    "\n"
+    "    return re.sub(\n"
+    '        r"<tool_call>(read|read_file)(.*?)</tool_call>",\n'
+    "        replace_read_alias, content, flags=re.DOTALL,\n"
+    "    )\n"
 )
 
 
@@ -60,12 +103,51 @@ def responses_sampling_value(model_type, value, parameter):
     return {"temperature": 0.7, "top_p": 0.95}[parameter]
 
 
+def normalize_poolside_tool_aliases(content, tool_names):
+    if "exec_command" not in tool_names:
+        return content
+
+    def replace_read_alias(match):
+        arguments = dict(
+            re.findall(
+                r"<arg_key>(path|file_path|workdir)</arg_key>\s*"
+                r"<arg_value>(.*?)</arg_value>",
+                match.group(2),
+                flags=re.DOTALL,
+            )
+        )
+        path = arguments.get("path") or arguments.get("file_path")
+        if not path:
+            return match.group(0)
+        command = "sed -n '1,240p' -- " + shlex.quote(path)
+        replacement = (
+            "<tool_call>exec_command"
+            "<arg_key>cmd</arg_key>"
+            f"<arg_value>{command}</arg_value>"
+        )
+        if arguments.get("workdir"):
+            replacement += (
+                "<arg_key>workdir</arg_key>"
+                f"<arg_value>{arguments['workdir']}</arg_value>"
+            )
+        return replacement + "</tool_call>"
+
+    return re.sub(
+        r"<tool_call>(read|read_file)(.*?)</tool_call>",
+        replace_read_alias,
+        content,
+        flags=re.DOTALL,
+    )
+
+
 def patch_source(source):
     for anchor in (IMPORT_ANCHOR, LOGGER_ANCHOR, REQUEST_ANCHOR):
         if source.count(anchor) != 1:
             raise ValueError(f"Expected one SGLang source anchor: {anchor!r}")
 
-    source = source.replace(IMPORT_ANCHOR, IMPORT_ANCHOR + "import os\n", 1)
+    source = source.replace(
+        IMPORT_ANCHOR, IMPORT_ANCHOR + "import os\nimport re\nimport shlex\n", 1
+    )
     source = source.replace(LOGGER_ANCHOR, LOGGER_ANCHOR + HELPER, 1)
     source = source.replace(
         REQUEST_ANCHOR,
@@ -98,6 +180,18 @@ def patch_source(source):
             "                    if not call_info_list:\n"
             "                        content = raw_tool_content\n"
             "                    for call_info in call_info_list:\n",
+            1,
+        )
+    if TOOL_PARSER_ANCHOR in source:
+        source = source.replace(
+            TOOL_PARSER_ANCHOR,
+            TOOL_PARSER_ANCHOR.replace(
+                "            parser = FunctionCallParser(\n",
+                "            content = _normalize_poolside_tool_aliases(\n"
+                "                self.reasoning_parser, content, chat_tools\n"
+                "            )\n"
+                "            parser = FunctionCallParser(\n",
+            ),
             1,
         )
     return source

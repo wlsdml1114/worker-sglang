@@ -151,6 +151,73 @@ class PatchSGLangResponsesTests(unittest.TestCase):
             patched,
         )
 
+    def test_poolside_read_alias_is_normalized_to_exec_command(self):
+        module = importlib.import_module("patch_sglang_responses")
+        content = (
+            "<tool_call>read_file"
+            "<arg_key>file_path</arg_key>"
+            "<arg_value>/repo/src/app.py</arg_value>"
+            "<arg_key>workdir</arg_key>"
+            "<arg_value>/repo</arg_value>"
+            "</tool_call>"
+        )
+
+        normalized = module.normalize_poolside_tool_aliases(
+            content, {"exec_command"}
+        )
+
+        self.assertIn("<tool_call>exec_command", normalized)
+        self.assertIn("<arg_key>cmd</arg_key>", normalized)
+        self.assertIn(
+            "<arg_value>sed -n '1,240p' -- /repo/src/app.py</arg_value>",
+            normalized,
+        )
+        self.assertIn(
+            "<arg_key>workdir</arg_key><arg_value>/repo</arg_value>",
+            normalized,
+        )
+
+    def test_poolside_read_alias_is_not_changed_without_exec_command(self):
+        module = importlib.import_module("patch_sglang_responses")
+        content = (
+            "<tool_call>read"
+            "<arg_key>path</arg_key><arg_value>/repo/src/app.py</arg_value>"
+            "</tool_call>"
+        )
+
+        self.assertEqual(
+            module.normalize_poolside_tool_aliases(content, {"read"}), content
+        )
+
+    def test_source_normalizes_poolside_alias_before_native_tool_parse(self):
+        module = importlib.import_module("patch_sglang_responses")
+        source = (
+            "import logging\n"
+            "\n"
+            "logger = logging.getLogger(__name__)\n"
+            "\n"
+            "        chat_request = ChatCompletionRequest(\n"
+            "            stop=request.stop,\n"
+            "        )\n"
+            "\n"
+            "        if (\n"
+            "            content\n"
+            "            and chat_tools\n"
+            "            and self.tool_call_parser\n"
+            "            and request.tool_choice != \"none\"\n"
+            "        ):\n"
+            "            parser = FunctionCallParser(\n"
+        )
+
+        patched = module.patch_source(source)
+
+        self.assertIn(
+            "content = _normalize_poolside_tool_aliases(\n"
+            "                self.reasoning_parser, content, chat_tools\n"
+            "            )",
+            patched,
+        )
+
     def test_poolside_thinking_is_enabled_unless_request_explicitly_disables_it(self):
         module = importlib.import_module("patch_sglang_responses")
 
