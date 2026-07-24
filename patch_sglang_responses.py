@@ -33,7 +33,7 @@ HELPER = (
     '    disabled = os.environ.get("RESPONSES_DISABLE_THINKING", "").lower()\n'
     '    if disabled in {"true", "1", "yes"}:\n'
     "        return False\n"
-    '    if model_type != "poolside_v1":\n'
+    '    if model_type not in {"poolside_v1", "qwen3"}:\n'
     "        return None\n"
     "    reasoning = getattr(request, \"reasoning\", None)\n"
     "    effort = getattr(reasoning, \"effort\", None)\n"
@@ -90,7 +90,7 @@ def responses_thinking_enabled(model_type, effort):
     disabled = os.environ.get("RESPONSES_DISABLE_THINKING", "").lower()
     if disabled in {"true", "1", "yes"}:
         return False
-    if model_type != "poolside_v1":
+    if model_type not in {"poolside_v1", "qwen3"}:
         return None
     return effort not in {"none", "no_think"}
 
@@ -166,9 +166,10 @@ def patch_source(source):
         source = source.replace(
             THINKING_ANCHOR,
             THINKING_ANCHOR
-            + '        if self.reasoning_parser == "poolside_v1":\n'
-            + "            return _responses_thinking_enabled("
-            + "self.reasoning_parser, request)\n",
+            + "        enabled = _responses_thinking_enabled("
+            + "self.reasoning_parser, request)\n"
+            + "        if enabled is not None:\n"
+            + "            return enabled\n",
             1,
         )
     if TOOL_PARSE_ANCHOR in source:
